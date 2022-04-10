@@ -119,12 +119,72 @@ def recommend_portfolio(intent_request):
     """
 
     first_name = get_slots(intent_request)["firstName"]
-    age = get_slots(intent_request)["age"]
-    investment_amount = get_slots(intent_request)["investmentAmount"]
+    age = parse_int(get_slots(intent_request)["age"])
+    investment_amount = parse_int(get_slots(intent_request)["investmentAmount"])
     risk_level = get_slots(intent_request)["riskLevel"]
     source = intent_request["invocationSource"]
+    
+    validation_result = ""
+    # Validate the age, it should be > 0 and <65
+    if age > 65 or age < 0:
+        validation_result = build_validation_result(
+            False,
+            "amount",
+            "You should be under 65 years old to use this bot.",
+            )
+    # Validate the investment amount, it should be >=5000
+    elif investment_amount <5000:
+        validation_result = build_validation_result(
+            False,
+            "amount",
+            "The investment amount should be greater or equal to 5000, "
+            "please provide a correct amount in dollars.",
+            )
+    else:
+        validation_result = build_validation_result(True, None, None)
+    # Gets all the slots
+    slots = get_slots(intent_request)
+    # If the data provided by the user is not valid,
+    # the elicitSlot dialog action is used to re-prompt for the first violation detected.
+    if not validation_result["isValid"]:
+        slots[validation_result["violatedSlot"]] = None  # Cleans invalid slot
+    # Returns an elicitSlot dialog to request new data for the invalid slot
+        return elicit_slot(
+            intent_request["sessionAttributes"],
+            intent_request["currentIntent"]["name"],
+            slots,
+            validation_result["violatedSlot"],
+            validation_result["message"],
+        )
+    
+    # Fetch current session attributes
+    output_session_attributes = intent_request["sessionAttributes"]
 
-    # YOUR CODE GOES HERE!
+    # Once all slots are valid, a delegate dialog is returned to Lex to choose the next course of action.
+    return delegate(output_session_attributes, get_slots(intent_request))
+
+
+
+    
+    recommendation = ""
+    
+    if risk_level == "None":
+        recommendation = "Based on your selected risk, I recommend a portfolio of 100% bonds (AGG), 0% equities (SPY)"
+    elif risk_level == "Low":
+        recommendation = "Based on your selected risk, I recommend a portfolio of 60% bonds (AGG), 40% equities (SPY)"
+    elif risk_level == "Medium":
+        recommendation = "Based on your selected risk, I recommend a portfolio of 40% bonds (AGG), 60% equities (SPY)"
+    else:
+        recommendation = "Based on your selected risk, I recommend a portfolio of 20% bonds (AGG), 80% equities (SPY)"
+    
+    return close(
+        intent_request["sessionAttributes"],
+        "Fulfilled",
+        {
+            "contentType": "PlainText",
+            "content": "{}".format(recommendation),
+        },
+    )
 
 
 ### Intents Dispatcher ###
